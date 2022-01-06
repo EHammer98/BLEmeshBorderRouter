@@ -1,0 +1,13 @@
+F1: first setup with the following functions:
+connect
+refreshMesh (shows only device index and UUID)
+switchOn
+switchOff
+lightStat (plain response)
+addDev
+removeDev (untested)
+
+F2:
+meshRefresh: showing more info instead of only UUID)
+lightStat: filterd response so it can be used by other programs
+Logging
