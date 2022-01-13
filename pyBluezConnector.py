@@ -1,7 +1,7 @@
 #!/usr/bin/python
 import sys, os, subprocess, json, time
 
-version = "0.0.1"
+version = "0.0.2"
 git = "https://github.com/EHammer98/BLEmeshBorderRouter"
 
 process = subprocess.Popen(['stdbuf', '-oL', '-i0', 'meshctl'], 
@@ -37,9 +37,10 @@ def refreshMesh():
     #print("Response: " + str(process.stdout.readline().decode('utf8')) + "\n")
     with open("/home/pi/.config/meshctl/prov_db.json", 'r') as file:
         data = json.load(file)
-        
-        for i, p in enumerate(data['nodes']):
-            print(str(i) + ": " + p['deviceKey'])
+        print(str(data)) 
+       # for i, p in enumerate(data['nodes']):
+       #     print(str(i) + ": " + p['deviceKey'])
+
 
 def switchOn(node):
     global process
@@ -110,36 +111,31 @@ def addDev(uuid):
             break
 
 def removeDev(uuid, node0, node1, node2, node3):
+
     global process
     process.stdin.write("menu config\n".encode())
     time.sleep(0.5)
     nodes = [node0, node1, node2, node3]
     
-    for n in nodes:
-        process.stdin.write(("target " + str(n) + "\n").encode())
-        time.sleep(0.5)
-        process.stdin.write(("node-reset\n").encode())
-        while 1:
-            try:
-                response = process.stdout.readline().decode('utf8')
-                print("Response: " + response + "\n")
-                if (response == 'Failed to AcquireWrite\n'):
-                    print("Not able to reach node, reconnecting now...")
-                    connect()
-            except:
-                break
-    process.stdin.write("back\n".encode())
-    time.sleep(0.5)
-    process.stdin.write(("disconnect " + uuid + "\n").encode())
-    while 1:
-        try:
-            response = process.stdout.readline().decode('utf8')
-            print("Response: " + response + "\n")
-            if (response == 'Failed to AcquireWrite\n'):
-                print("Not able to reach node, reconnecting now...")
-                connect()
-        except:
-            break
+    data = ""
+    with open("/home/pi/.config/meshctl/prov_db.json", 'r') as file:
+        data = json.load(file)
+        for i, p in enumerate(data['nodes']):
+            print(str(i) + ": " + p['deviceKey'])
+            if p['deviceKey'] == uuid:
+                print("object: " + str(p))
+                print("key: " + str(p['deviceKey']))
+                del p
+                #del p['deviceKey']      
+        file.close()
+
+    with open('/home/pi/.config/meshctl/prov_db.json', 'w') as outfile:      
+        data  = json.dump(data, outfile)
+        print("data: " + str(data))
+        file.close()
+    #3df989dc5f8808e79d1a861da8af9b7b
+
+
 
 def main():
     print("pyBluezConnector | By E. Hammer | V.: " + version)
