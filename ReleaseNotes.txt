@@ -8,6 +8,6 @@ addDev
 removeDev (untested)
 
 F2:
-meshRefresh: showing more info instead of only UUID)
+meshRefresh: showing more info (full JSON DB file) instead of only UUID)
 lightStat: filterd response so it can be used by other programs
-Logging
+removeDev: (tested)
