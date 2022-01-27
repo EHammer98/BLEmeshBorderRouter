@@ -1,13 +1,16 @@
 F1: first setup with the following functions:
-connect
-refreshMesh (shows only device index and UUID)
-switchOn
-switchOff
-lightStat (plain response)
-addDev
-removeDev (untested)
+•	connect
+•	refreshMesh (shows only device index and UUID)
+•	switchOn
+•	switchOff
+•	lightStat (plain response)
+•	addDev
+•	removeDev (untested)
 
-F2:
-meshRefresh: showing more info (full JSON DB file) instead of only UUID)
-lightStat: filterd response so it can be used by other programs
-removeDev: (tested)
+
+F2: Update
+•	meshRefresh: showing more info instead of only UUID, full JSON SB export
+•	removeDev tested
+•	lightStat: filterd response so it can be used by other programs
+•	Provisioning: filterd response so you know how much times you need to push the button
+•	New function: group, this function will take care of binding and grouping nodes

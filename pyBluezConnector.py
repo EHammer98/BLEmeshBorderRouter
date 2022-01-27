@@ -2,9 +2,11 @@
 import sys, os, subprocess, json, time
 import fileinput
 
+#Version and source info
 version = "0.0.3"
 git = "https://github.com/EHammer98/BLEmeshBorderRouter"
 
+#used for getting response from blueZ
 process = subprocess.Popen(['stdbuf', '-oL', '-i0', 'meshctl'], 
     bufsize=0, 
     stdin=subprocess.PIPE, 
@@ -12,6 +14,7 @@ process = subprocess.Popen(['stdbuf', '-oL', '-i0', 'meshctl'],
     # universal_newlines=True
 )  
 
+#Make connection to all devices in mesh network
 def connect():
     global process 
     process.stdin.write("back\n".encode())
@@ -23,6 +26,7 @@ def connect():
     process.stdin.write("connect 0\n".encode())
     time.sleep(10)
 
+#Setup connections with all devices in network and with meshctl
 def init():
     try:
         global process
@@ -37,7 +41,7 @@ def init():
 
 
 
-
+#Returns the json_db file containing all info about the bridge and devices
 def refreshMesh():
     #global process
     #process.stdin.write("mesh-info\n".encode())
@@ -48,33 +52,35 @@ def refreshMesh():
        # for i, p in enumerate(data['nodes']):
        #     print(str(i) + ": " + p['deviceKey'])
 
+#config. devices and put in a group
 def group(node, group, kind):
     global process
     if (kind == "light"):
         process.stdin.write("menu config\n".encode())
         time.sleep(0.5)
-        process.stdin.write(("target " + str(node) + "\n").encode())
+        process.stdin.write(("target " + str(node) + "\n").encode()) #select node
         time.sleep(0.5)
-        process.stdin.write(("appkey-add 1\n").encode())
+        process.stdin.write(("appkey-add 1\n").encode()) # add app key
         time.sleep(0.5)
-        process.stdin.write(("bind 0 1 1000\n").encode())
+        process.stdin.write(("bind 0 1 1000\n").encode()) # config if it is a switch or light
         time.sleep(0.5)
-        process.stdin.write(("sub-add " + str(node) + " " + str(group) +  " 1000\n").encode())
+        process.stdin.write(("sub-add " + str(node) + " " + str(group) +  " 1000\n").encode()) #make it subscribe or publish
         time.sleep(0.5)
 
     if (kind == "switch"):
         process.stdin.write("menu config\n".encode())
         time.sleep(0.5)
-        process.stdin.write(("target " + str(node) + "\n").encode())
+        process.stdin.write(("target " + str(node) + "\n").encode()) #select node
         time.sleep(0.5)
-        process.stdin.write(("appkey-add 1\n").encode())
+        process.stdin.write(("appkey-add 1\n").encode()) # add app key
         time.sleep(0.5)
-        process.stdin.write(("bind 0 1 1001\n").encode())
+        process.stdin.write(("bind 0 1 1001\n").encode()) # config if it is a switch or light
         time.sleep(0.5)
-        process.stdin.write(("pub-set " + str(node) + " " + str(group) +  " 1 0 0 1001\n").encode())
+        process.stdin.write(("pub-set " + str(node) + " " + str(group) +  " 1 0 0 1001\n").encode()) #make it subscribe or publish
         time.sleep(0.5)
 
-    print("Response: " + str(process.stdout.readline().decode('utf8')) + "\n")
+    print("Response: " + str(process.stdout.readline().decode('utf8')) + "\n") # DEBUG
+    #Reconnect if not able to reach node
     while 1:
         try:
             response = process.stdout.readline().decode('utf8')
@@ -84,7 +90,7 @@ def group(node, group, kind):
                 connect()
         except:
             break
-
+# switch node on
 def switchOn(node):
     global process
     process.stdin.write("menu onoff\n".encode())
@@ -94,16 +100,17 @@ def switchOn(node):
     process.stdin.write(("onoff 1\n").encode())
     time.sleep(0.5)
     print("Response: " + str(process.stdout.readline().decode('utf8')) + "\n")
+     #Reconnect if not able to reach node
     while 1:
         try:
             response = process.stdout.readline().decode('utf8')
             print("Response: " + response + "\n")
             if (response == 'Failed to AcquireWrite\n'):
-                print("Not able to reach node, reconnecting now...")
+                print("Not able to reach node, reconnecting now...")  # DEBUG
                 connect()
         except:
             break
-
+# switch node off
 def switchOff(node):
     global process
     process.stdin.write("menu onoff\n".encode())
@@ -111,16 +118,17 @@ def switchOff(node):
     process.stdin.write(("target " + str(node) + "\n").encode())
     time.sleep(0.5)
     process.stdin.write(("onoff 0\n").encode())
+     #Reconnect if not able to reach node
     while 1:
         try:
             response = process.stdout.readline().decode('utf8')
             print("Response: " + response + "\n")
             if (response == 'Failed to AcquireWrite\n'):
-                print("Not able to reach node, reconnecting now...")
+                print("Not able to reach node, reconnecting now...")  # DEBUG
                 connect()
         except:
             break
-
+# return light status
 def lightStat(node):
     global process
     process.stdin.write("menu onoff\n".encode())
@@ -136,25 +144,28 @@ def lightStat(node):
             cnt = cnt + 1
             response = process.stdout.readline().decode('utf8')
             #print("Response: " + response + "\n")
+            #filter response
             if ("On Off Model Message received (1) opcode 8204" in response):
                 #print("count: " + str(cnt) + "\n")
                 trgt = cnt + 2
+                #makes sure that the right line is filterd
             if (cnt == trgt - 1):
                 #print("Response: " + str(cnt) + response + "\n")  
                 responseList = response.split()
                 #print(responseList[5] + "\n")
                 if ("1" in responseList[5]):
                     #print("ON \n")
-                    return "On"
+                    return "ON"
                 else:
                     #print("OFF \n")
-                    return "Off"
+                    return "OFF"
+            #Reconnect if not able to reach node
             if (response == 'Failed to AcquireWrite\n'):
-                print("Not able to reach node, reconnecting now...")
+                print("Not able to reach node, reconnecting now...")  # DEBUG
                 connect()
         except:
             lightStat(node)
-
+# provision unknown device and return the amount of button pushes
 def addDev(uuid):
     global process
     process.stdin.write(("provision " + str(uuid) + "\n").encode())
@@ -168,25 +179,29 @@ def addDev(uuid):
             response = process.stdout.readline().decode('utf8')
             #print("Response: " + response + "\n")
             time.sleep(0.1)
+            #filter response
             if ("Trying to connect Device" in response):
                 print("count: " + str(cnt) + "\n")
                 trgt = cnt + 39
+                #makes sure that the right line is filterd
             if (cnt == trgt - 1):
                 #print("Response: " + str(cnt) + response + "\n")  
                 responseList = response.split()
                 print("List: " + str(responseList) + "\n")
                 print("Item : " + responseList[6] + "\n")
                 return responseList[6]
+            #Reconnect if not able to reach node
             if (response == 'Failed to AcquireWrite\n'):
-                print("Not able to reach node, reconnecting now...")
+                print("Not able to reach node, reconnecting now...")  # DEBUG
                 connect()
         except:
             addDev(uuid)
-
+# remove dev. from network and bridge (BlueZ)
 def removeDev(uuid, devKey, node0, node1, node2, node3):
 
     global process
-    items = []
+    items = [] #containing nodes
+    #Empty json db file
     jsonFile = {
   "$schema":"file:\/\/\/BlueZ\/Mesh\/schema\/mesh.jsonschema",
   "meshName":"BT Mesh",
@@ -231,20 +246,21 @@ def removeDev(uuid, devKey, node0, node1, node2, node3):
     nodes = [node0, node1, node2, node3]
     
     data = ""
+    #Search for node that needs to be removed
     with open("/home/pi/.config/meshctl/prov_db.json", 'r') as file:
         data = json.load(file)
         for i, p in enumerate(data['nodes']):
-            print(str(i) + ": " + p['deviceKey'])
+            print(str(i) + ": " + p['deviceKey'])  # DEBUG
             if not p['deviceKey'] == devKey:
                 items.append(p)   
         file.close()
 
     jsonFile["nodes"].extend(items)
-
+    #write back result
     with open('/home/pi/.config/meshctl/prov_db.json', 'w') as outfile:      
         json.dump(jsonFile, outfile)
         outfile.close()
-
+    #remove nodes from network
     for n in nodes:
         process.stdin.write(("target " + str(n) + "\n").encode())
         time.sleep(0.5)
@@ -252,9 +268,9 @@ def removeDev(uuid, devKey, node0, node1, node2, node3):
         while 1:
             try:
                 response = process.stdout.readline().decode('utf8')
-                print("Response: " + response + "\n")
+                print("Response: " + response + "\n")  # DEBUG
                 if (response == 'Failed to AcquireWrite\n'):
-                    print("Not able to reach node, reconnecting now...")
+                    print("Not able to reach node, reconnecting now...")  # DEBUG
                     connect()
             except:
                 break
@@ -263,16 +279,17 @@ def removeDev(uuid, devKey, node0, node1, node2, node3):
     process.stdin.write((str("disconnect " + uuid + "\n")).encode())
     while 1:
         try:
-            response = process.stdout.readline().decode('utf8')
+            response = process.stdout.readline().decode('utf8')  # DEBUG
             print("Response: " + response + "\n")
+             #Reconnect if not able to reach node
             if (response == 'Failed to AcquireWrite\n'):
-                print("Not able to reach node, reconnecting now...")
+                print("Not able to reach node, reconnecting now...") # DEBUG
                 connect()
             refreshMesh()
         except:
             break
 
-
+# main for debugging
 def main():
     print("pyBluezConnector | By E. Hammer | V.: " + version)
     print("Visit: " + git + " for more info \n")
