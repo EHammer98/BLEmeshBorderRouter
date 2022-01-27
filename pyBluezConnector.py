@@ -2,7 +2,7 @@
 import sys, os, subprocess, json, time
 import fileinput
 
-version = "0.0.2"
+version = "0.0.3"
 git = "https://github.com/EHammer98/BLEmeshBorderRouter"
 
 process = subprocess.Popen(['stdbuf', '-oL', '-i0', 'meshctl'], 
@@ -11,14 +11,6 @@ process = subprocess.Popen(['stdbuf', '-oL', '-i0', 'meshctl'],
     stdout=subprocess.PIPE
     # universal_newlines=True
 )  
-
-def init():
-    global process
-    # start meshctl process
-    os.environ['PYTHONUNBUFFERED'] = '1'
-    # read opening line
-    process.stdout.readline()
-    os.set_blocking(process.stdout.fileno(), False)
 
 def connect():
     global process 
@@ -31,6 +23,20 @@ def connect():
     process.stdin.write("connect 0\n".encode())
     time.sleep(10)
 
+def init():
+    try:
+        global process
+        # start meshctl process
+        os.environ['PYTHONUNBUFFERED'] = '1'
+        # read opening line
+        process.stdout.readline()
+        os.set_blocking(process.stdout.fileno(), False)
+        connect()
+    except:
+        connect()
+
+
+
 
 def refreshMesh():
     #global process
@@ -42,6 +48,42 @@ def refreshMesh():
        # for i, p in enumerate(data['nodes']):
        #     print(str(i) + ": " + p['deviceKey'])
 
+def group(node, group, kind):
+    global process
+    if (kind == "light"):
+        process.stdin.write("menu config\n".encode())
+        time.sleep(0.5)
+        process.stdin.write(("target " + str(node) + "\n").encode())
+        time.sleep(0.5)
+        process.stdin.write(("appkey-add 1\n").encode())
+        time.sleep(0.5)
+        process.stdin.write(("bind 0 1 1000\n").encode())
+        time.sleep(0.5)
+        process.stdin.write(("sub-add " + str(node) + " " + str(group) +  " 1000\n").encode())
+        time.sleep(0.5)
+
+    if (kind == "switch"):
+        process.stdin.write("menu config\n".encode())
+        time.sleep(0.5)
+        process.stdin.write(("target " + str(node) + "\n").encode())
+        time.sleep(0.5)
+        process.stdin.write(("appkey-add 1\n").encode())
+        time.sleep(0.5)
+        process.stdin.write(("bind 0 1 1001\n").encode())
+        time.sleep(0.5)
+        process.stdin.write(("pub-set " + str(node) + " " + str(group) +  " 1 0 0 1001\n").encode())
+        time.sleep(0.5)
+
+    print("Response: " + str(process.stdout.readline().decode('utf8')) + "\n")
+    while 1:
+        try:
+            response = process.stdout.readline().decode('utf8')
+            print("Response: " + response + "\n")
+            if (response == 'Failed to AcquireWrite\n'):
+                print("Not able to reach node, reconnecting now...")
+                connect()
+        except:
+            break
 
 def switchOn(node):
     global process
@@ -86,30 +128,60 @@ def lightStat(node):
     process.stdin.write(("target " + str(node) + "\n").encode())
     time.sleep(0.5)
     process.stdin.write(("get\n").encode())
+    cnt = 0
+    trgt = 0
+    loop = 1
     while 1:
         try:
+            cnt = cnt + 1
             response = process.stdout.readline().decode('utf8')
-            print("Response: " + response + "\n")
+            #print("Response: " + response + "\n")
+            if ("On Off Model Message received (1) opcode 8204" in response):
+                #print("count: " + str(cnt) + "\n")
+                trgt = cnt + 2
+            if (cnt == trgt - 1):
+                #print("Response: " + str(cnt) + response + "\n")  
+                responseList = response.split()
+                #print(responseList[5] + "\n")
+                if ("1" in responseList[5]):
+                    #print("ON \n")
+                    return "On"
+                else:
+                    #print("OFF \n")
+                    return "Off"
             if (response == 'Failed to AcquireWrite\n'):
                 print("Not able to reach node, reconnecting now...")
                 connect()
         except:
-            break
+            lightStat(node)
 
 def addDev(uuid):
     global process
-    process.stdin.write("provision " + uuid + "\n".encode())
+    process.stdin.write(("provision " + str(uuid) + "\n").encode())
     time.sleep(0.5)
-    process.stdin.write(("get\n").encode())
+    cnt = 0
+    trgt = 0
+    loop = 1
     while 1:
         try:
+            cnt = cnt + 1
             response = process.stdout.readline().decode('utf8')
-            print("Response: " + response + "\n")
+            #print("Response: " + response + "\n")
+            time.sleep(0.1)
+            if ("Trying to connect Device" in response):
+                print("count: " + str(cnt) + "\n")
+                trgt = cnt + 39
+            if (cnt == trgt - 1):
+                #print("Response: " + str(cnt) + response + "\n")  
+                responseList = response.split()
+                print("List: " + str(responseList) + "\n")
+                print("Item : " + responseList[6] + "\n")
+                return responseList[6]
             if (response == 'Failed to AcquireWrite\n'):
                 print("Not able to reach node, reconnecting now...")
                 connect()
         except:
-            break
+            addDev(uuid)
 
 def removeDev(uuid, devKey, node0, node1, node2, node3):
 
@@ -188,7 +260,7 @@ def removeDev(uuid, devKey, node0, node1, node2, node3):
                 break
     process.stdin.write("back\n".encode())
     time.sleep(0.5)
-    process.stdin.write(("disconnect " + uuid + "\n").encode())
+    process.stdin.write((str("disconnect " + uuid + "\n")).encode())
     while 1:
         try:
             response = process.stdout.readline().decode('utf8')
@@ -196,9 +268,9 @@ def removeDev(uuid, devKey, node0, node1, node2, node3):
             if (response == 'Failed to AcquireWrite\n'):
                 print("Not able to reach node, reconnecting now...")
                 connect()
+            refreshMesh()
         except:
             break
-
 
 
 def main():
@@ -243,11 +315,20 @@ def main():
             print("Enter node3: \n")
             n3 = input()
             removeDev(u,dev,n0,n1,n2,n3)
+        elif (x == "groupDev"):
+            print('GROUPING DEVICE... \n')
+            print("Enter node: \n")
+            n = input()
+            print("Enter group: \n")
+            g = input()
+            print("Enter type: \n")
+            t = input()
+            group(n,g,t)
         elif (x == "exit"):
             print("Bye!!")
             quit()
         else:
             print("Invalid cmd\n")
             
-init()           
-main()
+#init()           
+#main()
